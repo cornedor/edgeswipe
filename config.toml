@@ -1,0 +1,20 @@
+[touchpad]
+# device = "/dev/input/event5"  # auto-detect if omitted
+
+[gesture]
+edge_zone = 0.15
+distance_threshold = 200.0
+velocity_threshold = 100.0
+cooldown_ms = 500
+
+[[bindings]]
+edge = "right"
+fingers = 2
+direction = "left"
+command = "hyprctl dispatch global quickshell:sidepanel"
+
+[[bindings]]
+edge = "any"
+fingers = 2
+direction = "right"
+command = "hyprctl dispatch global quickshell:sidepanel-close"
