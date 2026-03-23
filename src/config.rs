@@ -49,7 +49,16 @@ pub struct Binding {
     pub edge: Edge,
     pub fingers: u32,
     pub direction: Direction,
-    pub command: String,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub grab: bool,
+    #[serde(default)]
+    pub ungrab: bool,
+    /// If set, this binding is only active in the named mode (e.g. "grabbed").
+    /// If None, the binding is only active in normal (ungrabbed) mode.
+    #[serde(default)]
+    pub mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -68,8 +77,8 @@ pub enum Direction {
 }
 
 impl Config {
-    pub fn load() -> Self {
-        let config_path = config_path();
+    pub fn load(path_override: Option<PathBuf>) -> Self {
+        let config_path = path_override.unwrap_or_else(config_path);
         if config_path.exists() {
             log::info!("Loading config from {}", config_path.display());
             let text = std::fs::read_to_string(&config_path).unwrap_or_else(|e| {
@@ -96,7 +105,10 @@ impl Default for Config {
                 edge: Edge::Right,
                 fingers: 2,
                 direction: Direction::Left,
-                command: "hyprctl dispatch global quickshell:sidepanel".into(),
+                command: Some("hyprctl dispatch global quickshell:sidepanel".into()),
+                grab: false,
+                ungrab: false,
+                mode: None,
             }],
         }
     }

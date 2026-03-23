@@ -24,6 +24,12 @@ enum State {
     Fired,
 }
 
+pub struct FireAction {
+    pub command: Option<String>,
+    pub grab: bool,
+    pub ungrab: bool,
+}
+
 pub struct GestureDetector {
     config: GestureConfig,
     bindings: Vec<Binding>,
@@ -33,11 +39,13 @@ pub struct GestureDetector {
     current_slot: usize,
     state: State,
     last_fire: Option<Instant>,
+    grabbed: bool,
+    scrollable: bool,
 }
 
 pub enum GestureResult {
     None,
-    Fire(String),
+    Fire(FireAction),
 }
 
 impl GestureDetector {
@@ -56,7 +64,29 @@ impl GestureDetector {
             current_slot: 0,
             state: State::Idle,
             last_fire: None,
+            grabbed: false,
+            scrollable: false,
         }
+    }
+
+    pub fn set_grabbed(&mut self, grabbed: bool) {
+        self.grabbed = grabbed;
+        // Reset cooldown on mode transitions so the close gesture isn't blocked
+        self.last_fire = None;
+        self.state = State::Idle;
+    }
+
+    pub fn set_scrollable(&mut self, scrollable: bool) {
+        self.scrollable = scrollable;
+    }
+
+    pub fn is_scrollable(&self) -> bool {
+        self.scrollable
+    }
+
+    /// Returns the number of currently active fingers.
+    pub fn active_finger_count(&self) -> u32 {
+        self.slots.iter().filter(|s| s.active).count() as u32
     }
 
     /// Feed raw evdev events here. Gesture evaluation happens on SYN events
@@ -144,11 +174,30 @@ impl GestureDetector {
             return GestureResult::None;
         }
 
+        // When grabbed and scrollable, skip gesture detection for grabbed-mode
+        // bindings — let the events pass through as scroll
+        let skip_grabbed_bindings = self.grabbed && self.scrollable;
+
         // Determine edge zone for active fingers
         let x_range = (self.x_max - self.x_min) as f64;
         let edge_width = x_range * self.config.edge_zone;
 
         for binding in &self.bindings {
+            // Filter bindings by mode
+            match &binding.mode {
+                Some(mode) if mode == "grabbed" => {
+                    if !self.grabbed || skip_grabbed_bindings {
+                        continue;
+                    }
+                }
+                Some(_) => continue, // unknown mode, skip
+                None => {
+                    if self.grabbed {
+                        continue; // normal bindings inactive while grabbed
+                    }
+                }
+            }
+
             if active_count != binding.fingers {
                 continue;
             }
@@ -208,7 +257,7 @@ impl GestureDetector {
 
             if gesture_complete {
                 log::info!(
-                    "Gesture fired: {} fingers, {:?} edge, {:?} swipe → {}",
+                    "Gesture fired: {} fingers, {:?} edge, {:?} swipe → {:?}",
                     binding.fingers,
                     binding.edge,
                     binding.direction,
@@ -216,7 +265,11 @@ impl GestureDetector {
                 );
                 self.state = State::Fired;
                 self.last_fire = Some(Instant::now());
-                return GestureResult::Fire(binding.command.clone());
+                return GestureResult::Fire(FireAction {
+                    command: binding.command.clone(),
+                    grab: binding.grab,
+                    ungrab: binding.ungrab,
+                });
             }
         }
 

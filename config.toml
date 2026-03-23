@@ -7,14 +7,18 @@ distance_threshold = 200.0
 velocity_threshold = 100.0
 cooldown_ms = 500
 
+# Open notification bar and grab touchpad
 [[bindings]]
 edge = "right"
 fingers = 2
 direction = "left"
 command = "hyprctl dispatch global quickshell:sidepanel"
+grab = true
 
+# Close notification bar and release (only active while grabbed)
 [[bindings]]
+mode = "grabbed"
 edge = "any"
 fingers = 2
 direction = "right"
-command = "hyprctl dispatch global quickshell:sidepanel-close"
+ungrab = true
