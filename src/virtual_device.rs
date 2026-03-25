@@ -23,10 +23,17 @@ pub fn create_virtual_touchpad(real: &Device) -> VirtualDevice {
         let abs_state = real.get_abs_state().expect("Failed to get abs state");
         for axis in abs_axes.iter() {
             let info = &abs_state[axis.0 as usize];
+            // Ensure no phantom touches: a positive tracking ID in the
+            // initial state would make libinput think a finger is already down.
+            let initial_value = if axis == AbsoluteAxisType::ABS_MT_TRACKING_ID {
+                -1
+            } else {
+                info.value
+            };
             let setup = UinputAbsSetup::new(
                 axis,
                 evdev::AbsInfo::new(
-                    info.value,
+                    initial_value,
                     info.minimum,
                     info.maximum,
                     info.fuzz,
